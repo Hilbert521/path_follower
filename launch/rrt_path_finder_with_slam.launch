@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="path_follower" pkg="path_follower" type="path_follower_node" output="screen"/>
+</launch>
