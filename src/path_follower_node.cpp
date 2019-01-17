@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 
 	tf::TransformListener t;
 	double robot_pos[3];
-	double Kp = 1;
+	double Kp = 3;
 	double forward_speed = 0;
 	while(ros::ok())
 	{
@@ -59,19 +59,25 @@ int main(int argc, char *argv[])
 		}
 		robot_pos[0] = transform_slam.getOrigin().x();
 		robot_pos[1] = transform_slam.getOrigin().y();
-		tf::Quaternion q(transform_slam.getRotation().x(), transform_slam.getRotation().y(), transform_slam.getRotation().z(), transform_slam.getRotation().w());
-		robot_pos[2] = q.getAngle();
-		// std::cout << path.poses.size() << std::endl;
+		tf::Quaternion q(transform_slam.getRotation());
+		robot_pos[2] = tf::getYaw(q);
 		
 		if(path.poses.size() != 0) // Path is not empty
 		{
-			// std::cout << "points: " << atan2(path.poses[1].pose.position.y - path.poses[0].pose.position.y, path.poses[1].pose.position.x - path.poses[0].pose.position.x) << std::endl;
-			// std::cout << "robot: " << robot_pos[2] << std::endl;
+			double angle_des = atan2(path.poses[1].pose.position.y - path.poses[0].pose.position.y, path.poses[1].pose.position.x - path.poses[0].pose.position.x);
+			// std::cout << transform_slam.getRotation().x() << " " << transform_slam.getRotation().y() << " " << transform_slam.getRotation().z() << " " << transform_slam.getRotation().w() << std::endl;
+			std::cout << "Angle forme par les points: " << angle_des << std::endl;
+			std::cout << "Orientation du robot: " << robot_pos[2] << std::endl;
 			geometry_msgs::Twist cmd_vel;
 
 			cmd_vel.linear.x = forward_speed;
-			cmd_vel.angular.z = Kp * ((atan2(path.poses[1].pose.position.y - path.poses[0].pose.position.y, path.poses[1].pose.position.x - path.poses[0].pose.position.x)) - robot_pos[2]);
-			std::cout << cmd_vel << std::endl;
+			if(angle_des > robot_pos[2] + M_PI && robot_pos[2] < 0)
+				cmd_vel.angular.z = - Kp * (2 * M_PI - (angle_des - robot_pos[2]));
+			else if(angle_des < robot_pos[2] -  M_PI && robot_pos[2] > 0)
+				cmd_vel.angular.z = Kp * (2 * M_PI + (angle_des - robot_pos[2]));
+			else
+				cmd_vel.angular.z = Kp * (angle_des - robot_pos[2]);
+
 			pubCmd.publish(cmd_vel);
 		}
 	}
