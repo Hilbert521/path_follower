@@ -11,19 +11,25 @@
 //  * Ros includes
 //  */
 #include "ros/ros.h"
-#include "nav_msgs/OccupancyGrid.h"
-#include "nav_msgs/GetMap.h"
-#include "nav_msgs/Odometry.h"
 #include "nav_msgs/Path.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "tf/transform_listener.h"
 
+/* Globals */
 nav_msgs::Path path;
 
+int nb_points = 0;
+bool new_path = false;
 
 void pathCallback(const nav_msgs::Path::ConstPtr& msg)//, nav_msgs::Path& p)
 {
-	path = nav_msgs::Path(*msg);
+	nb_points = msg->poses.size();
+	int old_nb_points = path.poses.size();
+	if(old_nb_points == 0 || (path.poses[old_nb_points - 1].pose.position.x != msg->poses[nb_points - 1].pose.position.x && path.poses[old_nb_points - 1].pose.position.y != msg->poses[nb_points - 1].pose.position.y))
+	{
+		path = nav_msgs::Path(*msg);
+		new_path = true;
+	}
 	// std::cout << "Callback" << std::endl;
 }
 
@@ -40,43 +46,40 @@ int main(int argc, char *argv[])
 	tf::TransformListener t;
 	double robot_pos[3];
 
-	double forward_speed = 2;
-	double min_speed = 0.2;
+	double forward_speed = 1;
+	double min_speed = 0.3;
 	/* PI corrector */
 	double Kp = 3;
 	double Ki = 0.00000001;
 
-	double max_cmd = 1.5;
+	double max_cmd = 1;
 	double K_rot = forward_speed/max_cmd;
-
-	
-	/* CL corrector from Plumet's course */
-	double K_rho = 0.1;
-	double K_alpha = 0.5;
-
-
-	
 
 	int current = 1;
 	double delta = 0.30; // 30 cm tolerance
-	int nb_points = 0;
+	// int nb_points = 0;
 	double sum_err = 0;
 	double err = 0;
 	while(ros::ok())
 	{
-		int old_nb_points = nb_points;
+		// int old_nb_points = nb_points;
 		ros::spinOnce();
 
-		nb_points = path.poses.size(); 
+		// nb_points = path.poses.size(); 
 
-		if(old_nb_points != 0 && nb_points != 0)
-			if(old_nb_points != nb_points || (path.poses[old_nb_points - 1].pose.position.x != path.poses[nb_points - 1].pose.position.x && path.poses[old_nb_points - 1].pose.position.y != path.poses[nb_points - 1].pose.position.y)) // New Goal detected
-				current = 1;
+		// if(old_nb_points != 0)
+			// if(old_nb_points != nb_points || ) // New Goal detected
+				// current = 1;
+		if(new_path == true)
+		{
+			current = 1;
+			new_path = false;
+		}
 		// Get frame change between slam_karto map frame and the frame of the odom of the robot
 		tf::StampedTransform transform_slam;
 		try
 		{
-			t.lookupTransform("map", "base_footprint", ros::Time(0), transform_slam);
+			t.lookupTransform("map", "base_link", ros::Time(0), transform_slam);
 		}
 		catch (tf::TransformException ex)
 		{
@@ -95,8 +98,8 @@ int main(int argc, char *argv[])
 			double err_y = fabs(robot_pos[1] - path.poses[current].pose.position.y);
 			if( err_x < delta &&  err_y < delta)
 				current++;
-			std::cout << "ERR x : " << err_x << " y : " << err_y << std::endl;
-			std::cout << nb_points << " " << current << std::endl;
+			// std::cout << "ERR x : " << err_x << " y : " << err_y << std::endl;
+			// std::cout << nb_points << " " << current << std::endl;
 			// double angle_des = atan2(path.poses[current].pose.position.y - path.poses[current - 1].pose.position.y, path.poses[current].pose.position.x - path.poses[current - 1].pose.position.x);
 			double angle_des = atan2(path.poses[current].pose.position.y - robot_pos[1], path.poses[current].pose.position.x - robot_pos[0]);
 			
@@ -130,15 +133,6 @@ int main(int argc, char *argv[])
 			}
 			cmd_vel.angular.z = cmd_angular;
 			cmd_vel.linear.x = min_speed + forward_speed - K_rot * fabs(cmd_vel.angular.z);
-			/* CL corrector */
-			// double alpha;
-			// if(angle_des > robot_pos[2])
-			// 	alpha = angle_des - robot_pos[2];
-			// else
-			// 	alpha = 2 * M_PI - (robot_pos[2] - angle_des);
-
-			// cmd_vel.linear.x = K_rho * dist;
-			// cmd_vel.angular.z = K_rho * sin(alpha) - K_alpha * alpha;
 
 			// std::cout << "linear : " << cmd_vel.linear.x << " angular : " << cmd_vel.angular.z << std::endl;
 
