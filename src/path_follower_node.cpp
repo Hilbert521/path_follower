@@ -14,12 +14,20 @@
 #include "nav_msgs/Path.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "tf/transform_listener.h"
+#include "sensor_msgs/LaserScan.h"
 
 /* Globals */
 nav_msgs::Path path;
+sensor_msgs::LaserScan lasers;
 
 int nb_points = 0;
 bool new_path = false;
+
+
+void lasersCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
+{
+	lasers = sensor_msgs::LaserScan(*msg);
+}
 
 void pathCallback(const nav_msgs::Path::ConstPtr& msg)//, nav_msgs::Path& p)
 {
@@ -46,8 +54,8 @@ int main(int argc, char *argv[])
 	tf::TransformListener t;
 	double robot_pos[3];
 
-	double forward_speed = 1;
-	double min_speed = 0.3;
+	double min_speed = 0.1;
+	double forward_speed = 0.5 - min_speed;
 	/* PI corrector */
 	double Kp = 3;
 	double Ki = 0.00000001;
@@ -62,6 +70,8 @@ int main(int argc, char *argv[])
 	double err = 0;
 	while(ros::ok())
 	{
+		geometry_msgs::Twist cmd_vel;
+
 		// int old_nb_points = nb_points;
 		ros::spinOnce();
 
@@ -91,7 +101,6 @@ int main(int argc, char *argv[])
 		tf::Quaternion q(transform_slam.getRotation());
 		robot_pos[2] = tf::getYaw(q);
 		
-		
 		if(nb_points != 0 && current < nb_points) // Path is not empty or not finished
 		{
 			double err_x = fabs(robot_pos[0] - path.poses[current].pose.position.x);
@@ -108,7 +117,6 @@ int main(int argc, char *argv[])
 			// std::cout << "Orientation du robot: " << robot_pos[2] << std::endl;
 			
 			// Send the command to the robot
-			geometry_msgs::Twist cmd_vel;
 
 			if(angle_des > robot_pos[2] + M_PI && robot_pos[2] < 0)
 				err = - 2 * M_PI + (angle_des - robot_pos[2]);
@@ -122,22 +130,29 @@ int main(int argc, char *argv[])
 			
 			/* PI corrector */
 			double cmd_angular;
-
+			int signe = 1;
 			cmd_angular= Kp * err ;//+ Ki * sum_err;
 			if(fabs(cmd_angular) > max_cmd)
 			{
 				if(cmd_angular > 0)
 					cmd_angular = max_cmd;
 				else
+				{
+					signe = -1;
 					cmd_angular = -max_cmd;
+				}
 			}
 			cmd_vel.angular.z = cmd_angular;
-			cmd_vel.linear.x = min_speed + forward_speed - K_rot * fabs(cmd_vel.angular.z);
+			cmd_vel.linear.x = min_speed + forward_speed - K_rot * signe * fabs(cmd_vel.angular.z);
 
 			// std::cout << "linear : " << cmd_vel.linear.x << " angular : " << cmd_vel.angular.z << std::endl;
 
 			pubCmd.publish(cmd_vel);
 		}
+		cmd_vel.angular.z = 0;
+		cmd_vel.linear.x = 0;
+		pubCmd.publish(cmd_vel);
+
 	}
 	return 0;
 }
