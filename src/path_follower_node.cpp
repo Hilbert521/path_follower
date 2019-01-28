@@ -54,13 +54,13 @@ int main(int argc, char *argv[])
 	tf::TransformListener t;
 	double robot_pos[3];
 
+	double max_cmd = 0.5;
 	double min_speed = 0.1;
-	double forward_speed = 0.5 - min_speed;
+	double forward_speed = max_cmd - min_speed;
 	/* PI corrector */
 	double Kp = 3;
 	double Ki = 0.00000001;
-
-	double max_cmd = 1;
+	
 	double K_rot = forward_speed/max_cmd;
 
 	int current = 1;
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 			/* PI corrector */
 			double cmd_angular;
 			int signe = 1;
-			cmd_angular= Kp * err ;//+ Ki * sum_err;
+			cmd_angular= Kp * err ;	
 			if(fabs(cmd_angular) > max_cmd)
 			{
 				if(cmd_angular > 0)
@@ -149,9 +149,12 @@ int main(int argc, char *argv[])
 
 			pubCmd.publish(cmd_vel);
 		}
-		cmd_vel.angular.z = 0;
-		cmd_vel.linear.x = 0;
-		pubCmd.publish(cmd_vel);
+		else
+		{
+			cmd_vel.angular.z = 0;
+			cmd_vel.linear.x = 0;
+			pubCmd.publish(cmd_vel);
+		}
 
 	}
 	return 0;
