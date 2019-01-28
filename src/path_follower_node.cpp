@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 			
 			/* PI corrector */
 			double cmd_angular;
-			int signe = 1;
+			// int signe = 1;
 			cmd_angular= Kp * err ;	
 			if(fabs(cmd_angular) > max_cmd)
 			{
@@ -138,12 +138,12 @@ int main(int argc, char *argv[])
 					cmd_angular = max_cmd;
 				else
 				{
-					signe = -1;
+					// signe = -1;
 					cmd_angular = -max_cmd;
 				}
 			}
 			cmd_vel.angular.z = cmd_angular;
-			cmd_vel.linear.x = min_speed + forward_speed - K_rot * signe * fabs(cmd_vel.angular.z);
+			cmd_vel.linear.x = min_speed + forward_speed - K_rot * fabs(cmd_angular);
 
 			// std::cout << "linear : " << cmd_vel.linear.x << " angular : " << cmd_vel.angular.z << std::endl;
 
